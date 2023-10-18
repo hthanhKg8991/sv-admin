@@ -1,0 +1,54 @@
+image: docker:20
+
+services:
+  - docker:dind
+
+stages:
+  - build
+  - deploy
+
+before_script:
+  - docker version
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+build:
+  stage: build
+  only:
+    - master
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+deploy:
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - master
+  before_script:
+    - apk update && apk add openssh-client bash
+  script:
+    # run ssh-agent
+    - eval $(ssh-agent -s)
+
+    # generate ssh key
+    - bash -c 'ssh-add <(echo "$SSH_PRIVATE_KEY")'
+    - mkdir -p ~/.ssh
+    - ssh-keyscan -H $SSH_SERVER_IP >> ~/.ssh/known_hosts
+
+    # permission file known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+
+    # Down project, pull image & up project
+    - >
+      ssh $SSH_USER@$SSH_SERVER_IP
+      "docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY};
+      cd ${PATH_TO_PROJECT};
+      docker-compose down;
+      docker pull ${CI_REGISTRY_IMAGE}:latest;
+      docker-compose up -d;
+      docker image prune -f;"
+
+    - curl -d chat_id=-1001177768280 -d text="[GITLAB] - Deploy thành công! https://admin99.fe2.sieuviet-team.com"  https://api.telegram.org/bot1268233769:AAFJTHFk4y4dYLg4YnyiOc_jLoPMwZwsudY/sendMessage

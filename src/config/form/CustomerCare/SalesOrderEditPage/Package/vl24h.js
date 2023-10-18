@@ -1,0 +1,17 @@
+export const arrayVl24h = [
+    "product_group",
+    "jobbox_basic",
+    "jobbox",
+    "filter_resume_2018",
+    "effect",
+    "banner",
+    "minisite",
+    "bundle_package",
+    "combo_package",
+    "combo_post",
+    "account_service",
+    "account_service_filter_resume",
+    "jobbox_freemium",
+    "subscription_package",
+	 "service_point",
+];

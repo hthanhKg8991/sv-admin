@@ -1,0 +1,1 @@
+import React, {Component} from "react";class WrapperTable extends Component {    render() {        return<table className="table-default table-booking">            <tbody>            {this.props.children}            </tbody>        </table>    }}export default WrapperTable;

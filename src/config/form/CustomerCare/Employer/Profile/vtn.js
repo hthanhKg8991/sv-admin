@@ -1,0 +1,1 @@
+export const arrayVTN = ["phone", "contact_address"];

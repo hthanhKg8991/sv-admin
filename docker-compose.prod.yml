@@ -1,0 +1,28 @@
+version: '3.7'
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  app:
+    container_name: "admin-build-${PORT}"
+    image: "lmduy2612/admin-build:v1.0"
+    networks:
+      - app-network
+    volumes:
+      - '.:/app'
+      - './build:/app/build'
+  webserver:
+    image: nginx:alpine
+    container_name: "webserver-${PORT}"
+    restart: unless-stopped
+    volumes:
+      - './docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf'
+      - './build:/usr/share/nginx/html'
+    ports:
+      - "${PORT}:80"
+    networks:
+      - app-network
+    depends_on:
+      - app

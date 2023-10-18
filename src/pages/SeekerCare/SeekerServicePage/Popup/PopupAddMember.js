@@ -1,0 +1,201 @@
+import React,{Component} from "react";
+import Dropbox from 'components/Common/InputValue/Dropbox';
+import {connect} from "react-redux";
+import {bindActionCreators} from "redux";
+import config from 'config';
+import * as Constant from "utils/Constant";
+import * as apiAction from 'actions/apiAction';
+import * as uiAction from "actions/uiAction";
+import * as utils from "utils/utils";
+import * as ConstantURL from "utils/ConstantURL";
+import * as apiFn from 'api';
+import _ from "lodash";
+
+class PopupAddMember extends Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            object: Object.assign({},this.props.object),
+            object_required: ['staff_id', 'team_role'],
+            object_error: {},
+            name_focus: "",
+            staff_list: [],
+            staffLevelList: utils.convertArrayValueCommonData(this.props.sys.common.items, Constant.COMMON_DATA_KEY_staff_level),
+            staffLevelFilterList: []
+        };
+        this.onSave = this._onSave.bind(this);
+        this.onChange = this._onChange.bind(this);
+        this.onChangeTeamRole = this._onChangeTeamRole.bind(this);
+        // this.onChangeStaffLevel = this._onChangeStaffLevel.bind(this);
+        this.getCustomerCare = this._getCustomerCare.bind(this);
+    }
+    _onSave(data, object_required){
+        this.setState({object_error: {}});
+        this.setState({name_focus: ""});
+
+        let object = Object.assign({}, data);
+        let check = utils.checkOnSaveRequired(object, object_required);
+        if (check.error) {
+            this.setState({name_focus: check.field});
+            this.setState({object_error: check.fields});
+            return;
+        }
+        // append division_type
+        object = {...object, division_type: Constant.DIVISION_SEEKER};
+        this.props.uiAction.showLoading();
+        this.props.apiAction.requestApi(apiFn.fnPost, config.apiAuthDomain, ConstantURL.API_URL_POST_AUTH_TEAM_ADD_STAFF, object);
+    }
+    _onChange(value, name){
+        let object_error = this.state.object_error;
+        delete object_error[name];
+        this.setState({object_error: object_error});
+        this.setState({name_focus: ""});
+        let object = Object.assign({},this.state.object);
+        object[name] = value;
+        this.setState({object: object});
+    }
+
+    _onChangeTeamRole(value, name) {
+        let object_error = this.state.object_error;
+        delete object_error[name];
+        this.setState({object_error: object_error});
+        this.setState({name_focus: ""});
+
+        let object = Object.assign({},this.state.object);
+        object[name] = value;
+        if (value !== Constant.TEAM_ROLE_LEADER) {
+            delete object['employer_care_type'];
+            delete object_error['employer_care_type'];
+        }
+        object['customer_care_level'] = null;
+        this.setState({object: object});
+        this._filerStaffLevelList(value);
+    }
+
+    // tách ds staff level theo giá trị team_role
+    _filerStaffLevelList(value) {
+        let {staffLevelList} = this.state;
+        let staffLevelLeaderList = [];
+        let staffLevelMemberList = [];
+        if (value) {
+            _.forEach(staffLevelList,(item)=> {
+                if (parseInt(item.value) === 1) {
+                    staffLevelLeaderList.push(item);
+                } else {
+                    staffLevelMemberList.push(item);
+                }
+            });
+        }
+        if (value === Constant.TEAM_ROLE_LEADER) {
+            this.setState({staffLevelFilterList:staffLevelLeaderList});
+        } else {
+            this.setState({staffLevelFilterList:staffLevelMemberList});
+        }
+    }
+
+    _getCustomerCare(){
+        const {branch_code_real} = this.props;
+        let args = {
+            branch_code_real: branch_code_real,
+            status: Constant.STATUS_ACTIVED,
+            'division_code_list[0]': Constant.DIVISION_TYPE_seeker_care_leader,
+            'division_code_list[1]': Constant.DIVISION_TYPE_seeker_care_member,
+
+        };
+        this.props.apiAction.requestApi(apiFn.fnGet, config.apiAuthDomain, ConstantURL.API_URL_GET_AUTH_LIST_STAFF_FREE, args);
+    }
+    componentDidMount(){
+        this.getCustomerCare();
+        this._filerStaffLevelList(this.state.object.team_role);
+    }
+    componentWillReceiveProps(newProps) {
+        if (newProps.api[ConstantURL.API_URL_GET_AUTH_LIST_STAFF_FREE]){
+            let response = newProps.api[ConstantURL.API_URL_GET_AUTH_LIST_STAFF_FREE];
+            if (response.code === Constant.CODE_SUCCESS) {
+                this.setState({staff_list: response.data});
+            }
+            this.props.apiAction.deleteRequestApi(ConstantURL.API_URL_GET_AUTH_LIST_STAFF_FREE);
+        }
+        if (newProps.api[ConstantURL.API_URL_POST_AUTH_TEAM_ADD_STAFF]){
+            let response = newProps.api[ConstantURL.API_URL_POST_AUTH_TEAM_ADD_STAFF];
+            if (response.code === Constant.CODE_SUCCESS) {
+                this.props.uiAction.putToastSuccess("Thao tác thành công!");
+                this.props.uiAction.deletePopup();
+                this.props.uiAction.refreshList('CustomerServiceDetail');
+            }else{
+                this.setState({object_error: Object.assign({},response.data)});
+            }
+            this.props.uiAction.hideLoading();
+            this.props.apiAction.deleteRequestApi(ConstantURL.API_URL_POST_AUTH_TEAM_ADD_STAFF);
+        }
+    }
+    shouldComponentUpdate(nextProps, nextState) {
+        return !(JSON.stringify(nextState) === JSON.stringify(this.state));
+    }
+    render () {
+        let {object, object_error, object_required, name_focus, staff_list} = this.state;
+        let role_name = utils.convertArrayValueCommonData(this.props.sys.common.items,Constant.COMMON_DATA_KEY_role_name);
+
+        return (
+            <form onSubmit={(event)=>{
+                event.preventDefault();
+                this.onSave(object, object_required);
+            }}>
+                <input type="hidden" name="division_type" value={Constant.DIVISION_SEEKER}/>
+                <div className="dialog-popup-body">
+                    <div className="popupContainer">
+                        <div className="form-container row">
+                            <div className="col-sm-12 col-xs-12 padding0">
+                                <div className="col-sm-6 col-xs-12 mb10">
+                                <Dropbox
+                                    name="staff_id"
+                                    label="CSNTV" data={staff_list}
+                                    required={object_required.includes('staff_id')}
+                                    key_title="login_name"
+                                    key_value="id"
+                                    error={object_error.staff_id}
+                                    value={object.staff_id}
+                                    nameFocus={name_focus}
+                                    onChange={this.onChange}
+                                />
+                                </div>
+                                <div className="col-sm-6 col-xs-12 mb10">
+                                    <Dropbox
+                                        name="team_role"
+                                        label="Quyền"
+                                        data={role_name}
+                                        required={object_required.includes('team_role')}
+                                        error={object_error.team_role}
+                                        value={object.team_role}
+                                        nameFocus={name_focus}
+                                        onChange={this.onChangeTeamRole}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr className="v-divider margin0" />
+                    <div className="v-card-action">
+                        <button type="submit" className="el-button el-button-success el-button-small">
+                            <span>Lưu</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        )
+    }
+}
+function mapStateToProps(state) {
+    return {
+        sys: state.sys,
+        api: state.api,
+        branch: state.branch,
+    };
+}
+function mapDispatchToProps(dispatch) {
+    return {
+        apiAction: bindActionCreators(apiAction, dispatch),
+        uiAction: bindActionCreators(uiAction, dispatch)
+    };
+}
+export default connect(mapStateToProps,mapDispatchToProps)(PopupAddMember);

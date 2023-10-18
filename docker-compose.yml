@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  admin:
+    container_name: "admin-${PORT}"
+    build: "./"
+    image: "admin-${PORT}"
+    volumes:
+      - '.:/var/www'
+      - './var/www/node_modules'
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "${PORT}:${PORT}"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin${PORT}.rule=Host(`${APP_HOST}`)"
+      - "traefik.http.routers.admin${PORT}.entrypoints=http"
+      - "traefik.http.routers.admin${PORT}.service=admin${PORT}"
+      - "traefik.http.services.admin${PORT}.loadbalancer.server.port=${PORT}"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      - app-network
+networks:
+  app-network:
+    external: true

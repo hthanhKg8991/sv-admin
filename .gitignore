@@ -1,0 +1,8 @@
+.env
+.idea
+build/
+build-prod/
+node_modules/
+*.iml
+.eslintrc.js
+.DS_Store
